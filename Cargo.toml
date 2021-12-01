@@ -1,0 +1,9 @@
+[package]
+name = "nl80211scan"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+neli = "0.6"
+num_enum = "*"
+macaddr = "*"
