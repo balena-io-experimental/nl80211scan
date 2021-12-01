@@ -1,5 +1,4 @@
-mod nl80211attr;
-mod nl80211cmd;
+mod enums;
 
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
@@ -17,8 +16,7 @@ use neli::nl::{NlPayload, Nlmsghdr};
 use neli::socket::NlSocketHandle;
 use neli::types::{Buffer, GenlBuffer, NlBuffer};
 
-use nl80211attr::Nl80211Attr;
-use nl80211cmd::Nl80211Cmd;
+use enums::{Nl80211Attr, Nl80211Cmd};
 
 const NL80211_FAMILY_NAME: &str = "nl80211";
 
