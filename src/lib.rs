@@ -1,10 +1,19 @@
 mod enums;
 
+#[allow(
+    dead_code,
+    non_upper_case_globals,
+    non_camel_case_types,
+    non_snake_case,
+    deref_nullptr,
+    unaligned_references,
+    clippy::redundant_static_lifetimes
+)]
+mod nl80211;
+
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
-
-use num_enum::TryFromPrimitive;
 
 use macaddr::MacAddr6;
 
@@ -20,22 +29,42 @@ use enums::{Nl80211Attr, Nl80211Cmd};
 
 const NL80211_FAMILY_NAME: &str = "nl80211";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, TryFromPrimitive)]
-#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InterfaceType {
     Unspecified = 0,
     Adhoc,
     Station,
-    Ap,
-    ApVlan,
-    Wds,
+    AP,
+    APVlan,
+    WDS,
     Monitor,
     MeshPoint,
-    P2pClient,
-    P2pGo,
-    P2pDevice,
+    P2PClient,
+    P2PGo,
+    P2PDevice,
     Ocb,
     Nan,
+}
+
+impl From<::std::os::raw::c_uint> for InterfaceType {
+    fn from(orig: ::std::os::raw::c_uint) -> Self {
+        match orig {
+            nl80211::nl80211_iftype_NL80211_IFTYPE_UNSPECIFIED => InterfaceType::Unspecified,
+            nl80211::nl80211_iftype_NL80211_IFTYPE_ADHOC => InterfaceType::Adhoc,
+            nl80211::nl80211_iftype_NL80211_IFTYPE_STATION => InterfaceType::Station,
+            nl80211::nl80211_iftype_NL80211_IFTYPE_AP => InterfaceType::AP,
+            nl80211::nl80211_iftype_NL80211_IFTYPE_AP_VLAN => InterfaceType::APVlan,
+            nl80211::nl80211_iftype_NL80211_IFTYPE_WDS => InterfaceType::WDS,
+            nl80211::nl80211_iftype_NL80211_IFTYPE_MONITOR => InterfaceType::Monitor,
+            nl80211::nl80211_iftype_NL80211_IFTYPE_MESH_POINT => InterfaceType::MeshPoint,
+            nl80211::nl80211_iftype_NL80211_IFTYPE_P2P_CLIENT => InterfaceType::P2PClient,
+            nl80211::nl80211_iftype_NL80211_IFTYPE_P2P_GO => InterfaceType::P2PGo,
+            nl80211::nl80211_iftype_NL80211_IFTYPE_P2P_DEVICE => InterfaceType::P2PDevice,
+            nl80211::nl80211_iftype_NL80211_IFTYPE_OCB => InterfaceType::Ocb,
+            nl80211::nl80211_iftype_NL80211_IFTYPE_NAN => InterfaceType::Nan,
+            _ => return InterfaceType::Unspecified,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
