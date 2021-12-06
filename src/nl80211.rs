@@ -86,29 +86,6 @@ pub type __u64 = ::std::os::raw::c_ulonglong;
 pub struct __kernel_fd_set {
     pub fds_bits: [::std::os::raw::c_ulong; 16usize],
 }
-#[test]
-fn bindgen_test_layout___kernel_fd_set() {
-    assert_eq!(
-        ::std::mem::size_of::<__kernel_fd_set>(),
-        128usize,
-        concat!("Size of: ", stringify!(__kernel_fd_set))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<__kernel_fd_set>(),
-        8usize,
-        concat!("Alignment of ", stringify!(__kernel_fd_set))
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<__kernel_fd_set>())).fds_bits as *const _ as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(__kernel_fd_set),
-            "::",
-            stringify!(fds_bits)
-        )
-    );
-}
 pub type __kernel_sighandler_t =
     ::std::option::Option<unsafe extern "C" fn(arg1: ::std::os::raw::c_int)>;
 pub type __kernel_key_t = ::std::os::raw::c_int;
@@ -135,29 +112,6 @@ pub type __kernel_ptrdiff_t = __kernel_long_t;
 #[derive(Debug, Copy, Clone)]
 pub struct __kernel_fsid_t {
     pub val: [::std::os::raw::c_int; 2usize],
-}
-#[test]
-fn bindgen_test_layout___kernel_fsid_t() {
-    assert_eq!(
-        ::std::mem::size_of::<__kernel_fsid_t>(),
-        8usize,
-        concat!("Size of: ", stringify!(__kernel_fsid_t))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<__kernel_fsid_t>(),
-        4usize,
-        concat!("Alignment of ", stringify!(__kernel_fsid_t))
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<__kernel_fsid_t>())).val as *const _ as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(__kernel_fsid_t),
-            "::",
-            stringify!(val)
-        )
-    );
 }
 pub type __kernel_off_t = __kernel_long_t;
 pub type __kernel_loff_t = ::std::os::raw::c_longlong;
@@ -671,39 +625,6 @@ pub struct nl80211_sta_flag_update {
     pub mask: __u32,
     pub set: __u32,
 }
-#[test]
-fn bindgen_test_layout_nl80211_sta_flag_update() {
-    assert_eq!(
-        ::std::mem::size_of::<nl80211_sta_flag_update>(),
-        8usize,
-        concat!("Size of: ", stringify!(nl80211_sta_flag_update))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<nl80211_sta_flag_update>(),
-        1usize,
-        concat!("Alignment of ", stringify!(nl80211_sta_flag_update))
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<nl80211_sta_flag_update>())).mask as *const _ as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_sta_flag_update),
-            "::",
-            stringify!(mask)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<nl80211_sta_flag_update>())).set as *const _ as usize },
-        4usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_sta_flag_update),
-            "::",
-            stringify!(set)
-        )
-    );
-}
 pub const nl80211_he_gi_NL80211_RATE_INFO_HE_GI_0_8: nl80211_he_gi = 0;
 pub const nl80211_he_gi_NL80211_RATE_INFO_HE_GI_1_6: nl80211_he_gi = 1;
 pub const nl80211_he_gi_NL80211_RATE_INFO_HE_GI_3_2: nl80211_he_gi = 2;
@@ -1211,56 +1132,10 @@ pub type nl80211_tx_rate_attributes = ::std::os::raw::c_uint;
 pub struct nl80211_txrate_vht {
     pub mcs: [__u16; 8usize],
 }
-#[test]
-fn bindgen_test_layout_nl80211_txrate_vht() {
-    assert_eq!(
-        ::std::mem::size_of::<nl80211_txrate_vht>(),
-        16usize,
-        concat!("Size of: ", stringify!(nl80211_txrate_vht))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<nl80211_txrate_vht>(),
-        2usize,
-        concat!("Alignment of ", stringify!(nl80211_txrate_vht))
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<nl80211_txrate_vht>())).mcs as *const _ as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_txrate_vht),
-            "::",
-            stringify!(mcs)
-        )
-    );
-}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct nl80211_txrate_he {
     pub mcs: [__u16; 8usize],
-}
-#[test]
-fn bindgen_test_layout_nl80211_txrate_he() {
-    assert_eq!(
-        ::std::mem::size_of::<nl80211_txrate_he>(),
-        16usize,
-        concat!("Size of: ", stringify!(nl80211_txrate_he))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<nl80211_txrate_he>(),
-        2usize,
-        concat!("Alignment of ", stringify!(nl80211_txrate_he))
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<nl80211_txrate_he>())).mcs as *const _ as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_txrate_he),
-            "::",
-            stringify!(mcs)
-        )
-    );
 }
 pub const nl80211_txrate_gi_NL80211_TXRATE_DEFAULT_GI: nl80211_txrate_gi = 0;
 pub const nl80211_txrate_gi_NL80211_TXRATE_FORCE_SGI: nl80211_txrate_gi = 1;
@@ -1341,67 +1216,6 @@ pub struct nl80211_pattern_support {
     pub max_pattern_len: __u32,
     pub max_pkt_offset: __u32,
 }
-#[test]
-fn bindgen_test_layout_nl80211_pattern_support() {
-    assert_eq!(
-        ::std::mem::size_of::<nl80211_pattern_support>(),
-        16usize,
-        concat!("Size of: ", stringify!(nl80211_pattern_support))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<nl80211_pattern_support>(),
-        1usize,
-        concat!("Alignment of ", stringify!(nl80211_pattern_support))
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_pattern_support>())).max_patterns as *const _ as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_pattern_support),
-            "::",
-            stringify!(max_patterns)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_pattern_support>())).min_pattern_len as *const _ as usize
-        },
-        4usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_pattern_support),
-            "::",
-            stringify!(min_pattern_len)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_pattern_support>())).max_pattern_len as *const _ as usize
-        },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_pattern_support),
-            "::",
-            stringify!(max_pattern_len)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_pattern_support>())).max_pkt_offset as *const _ as usize
-        },
-        12usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_pattern_support),
-            "::",
-            stringify!(max_pkt_offset)
-        )
-    );
-}
 pub const nl80211_wowlan_triggers___NL80211_WOWLAN_TRIG_INVALID: nl80211_wowlan_triggers = 0;
 pub const nl80211_wowlan_triggers_NL80211_WOWLAN_TRIG_ANY: nl80211_wowlan_triggers = 1;
 pub const nl80211_wowlan_triggers_NL80211_WOWLAN_TRIG_DISCONNECT: nl80211_wowlan_triggers = 2;
@@ -1442,53 +1256,6 @@ pub struct nl80211_wowlan_tcp_data_seq {
     pub offset: __u32,
     pub len: __u32,
 }
-#[test]
-fn bindgen_test_layout_nl80211_wowlan_tcp_data_seq() {
-    assert_eq!(
-        ::std::mem::size_of::<nl80211_wowlan_tcp_data_seq>(),
-        12usize,
-        concat!("Size of: ", stringify!(nl80211_wowlan_tcp_data_seq))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<nl80211_wowlan_tcp_data_seq>(),
-        4usize,
-        concat!("Alignment of ", stringify!(nl80211_wowlan_tcp_data_seq))
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_wowlan_tcp_data_seq>())).start as *const _ as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_wowlan_tcp_data_seq),
-            "::",
-            stringify!(start)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_wowlan_tcp_data_seq>())).offset as *const _ as usize
-        },
-        4usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_wowlan_tcp_data_seq),
-            "::",
-            stringify!(offset)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<nl80211_wowlan_tcp_data_seq>())).len as *const _ as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_wowlan_tcp_data_seq),
-            "::",
-            stringify!(len)
-        )
-    );
-}
 #[repr(C)]
 #[derive(Debug)]
 pub struct nl80211_wowlan_tcp_data_token {
@@ -1496,120 +1263,12 @@ pub struct nl80211_wowlan_tcp_data_token {
     pub len: __u32,
     pub token_stream: __IncompleteArrayField<__u8>,
 }
-#[test]
-fn bindgen_test_layout_nl80211_wowlan_tcp_data_token() {
-    assert_eq!(
-        ::std::mem::size_of::<nl80211_wowlan_tcp_data_token>(),
-        8usize,
-        concat!("Size of: ", stringify!(nl80211_wowlan_tcp_data_token))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<nl80211_wowlan_tcp_data_token>(),
-        4usize,
-        concat!("Alignment of ", stringify!(nl80211_wowlan_tcp_data_token))
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_wowlan_tcp_data_token>())).offset as *const _ as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_wowlan_tcp_data_token),
-            "::",
-            stringify!(offset)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_wowlan_tcp_data_token>())).len as *const _ as usize
-        },
-        4usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_wowlan_tcp_data_token),
-            "::",
-            stringify!(len)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_wowlan_tcp_data_token>())).token_stream as *const _
-                as usize
-        },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_wowlan_tcp_data_token),
-            "::",
-            stringify!(token_stream)
-        )
-    );
-}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct nl80211_wowlan_tcp_data_token_feature {
     pub min_len: __u32,
     pub max_len: __u32,
     pub bufsize: __u32,
-}
-#[test]
-fn bindgen_test_layout_nl80211_wowlan_tcp_data_token_feature() {
-    assert_eq!(
-        ::std::mem::size_of::<nl80211_wowlan_tcp_data_token_feature>(),
-        12usize,
-        concat!(
-            "Size of: ",
-            stringify!(nl80211_wowlan_tcp_data_token_feature)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<nl80211_wowlan_tcp_data_token_feature>(),
-        4usize,
-        concat!(
-            "Alignment of ",
-            stringify!(nl80211_wowlan_tcp_data_token_feature)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_wowlan_tcp_data_token_feature>())).min_len as *const _
-                as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_wowlan_tcp_data_token_feature),
-            "::",
-            stringify!(min_len)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_wowlan_tcp_data_token_feature>())).max_len as *const _
-                as usize
-        },
-        4usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_wowlan_tcp_data_token_feature),
-            "::",
-            stringify!(max_len)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_wowlan_tcp_data_token_feature>())).bufsize as *const _
-                as usize
-        },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_wowlan_tcp_data_token_feature),
-            "::",
-            stringify!(bufsize)
-        )
-    );
 }
 pub const nl80211_wowlan_tcp_attrs___NL80211_WOWLAN_TCP_INVALID: nl80211_wowlan_tcp_attrs = 0;
 pub const nl80211_wowlan_tcp_attrs_NL80211_WOWLAN_TCP_SRC_IPV4: nl80211_wowlan_tcp_attrs = 1;
@@ -1634,55 +1293,6 @@ pub struct nl80211_coalesce_rule_support {
     pub max_rules: __u32,
     pub pat: nl80211_pattern_support,
     pub max_delay: __u32,
-}
-#[test]
-fn bindgen_test_layout_nl80211_coalesce_rule_support() {
-    assert_eq!(
-        ::std::mem::size_of::<nl80211_coalesce_rule_support>(),
-        24usize,
-        concat!("Size of: ", stringify!(nl80211_coalesce_rule_support))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<nl80211_coalesce_rule_support>(),
-        1usize,
-        concat!("Alignment of ", stringify!(nl80211_coalesce_rule_support))
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_coalesce_rule_support>())).max_rules as *const _ as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_coalesce_rule_support),
-            "::",
-            stringify!(max_rules)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_coalesce_rule_support>())).pat as *const _ as usize
-        },
-        4usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_coalesce_rule_support),
-            "::",
-            stringify!(pat)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_coalesce_rule_support>())).max_delay as *const _ as usize
-        },
-        20usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_coalesce_rule_support),
-            "::",
-            stringify!(max_delay)
-        )
-    );
 }
 pub const nl80211_attr_coalesce_rule___NL80211_COALESCE_RULE_INVALID: nl80211_attr_coalesce_rule =
     0;
@@ -1996,41 +1606,6 @@ pub struct nl80211_vendor_cmd_info {
     pub vendor_id: __u32,
     pub subcmd: __u32,
 }
-#[test]
-fn bindgen_test_layout_nl80211_vendor_cmd_info() {
-    assert_eq!(
-        ::std::mem::size_of::<nl80211_vendor_cmd_info>(),
-        8usize,
-        concat!("Size of: ", stringify!(nl80211_vendor_cmd_info))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<nl80211_vendor_cmd_info>(),
-        4usize,
-        concat!("Alignment of ", stringify!(nl80211_vendor_cmd_info))
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_vendor_cmd_info>())).vendor_id as *const _ as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_vendor_cmd_info),
-            "::",
-            stringify!(vendor_id)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<nl80211_vendor_cmd_info>())).subcmd as *const _ as usize },
-        4usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_vendor_cmd_info),
-            "::",
-            stringify!(subcmd)
-        )
-    );
-}
 pub const nl80211_tdls_peer_capability_NL80211_TDLS_PEER_HT: nl80211_tdls_peer_capability = 1;
 pub const nl80211_tdls_peer_capability_NL80211_TDLS_PEER_VHT: nl80211_tdls_peer_capability = 2;
 pub const nl80211_tdls_peer_capability_NL80211_TDLS_PEER_WMM: nl80211_tdls_peer_capability = 4;
@@ -2046,43 +1621,6 @@ pub type nl80211_sched_scan_plan = ::std::os::raw::c_uint;
 pub struct nl80211_bss_select_rssi_adjust {
     pub band: __u8,
     pub delta: __s8,
-}
-#[test]
-fn bindgen_test_layout_nl80211_bss_select_rssi_adjust() {
-    assert_eq!(
-        ::std::mem::size_of::<nl80211_bss_select_rssi_adjust>(),
-        2usize,
-        concat!("Size of: ", stringify!(nl80211_bss_select_rssi_adjust))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<nl80211_bss_select_rssi_adjust>(),
-        1usize,
-        concat!("Alignment of ", stringify!(nl80211_bss_select_rssi_adjust))
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_bss_select_rssi_adjust>())).band as *const _ as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_bss_select_rssi_adjust),
-            "::",
-            stringify!(band)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<nl80211_bss_select_rssi_adjust>())).delta as *const _ as usize
-        },
-        1usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(nl80211_bss_select_rssi_adjust),
-            "::",
-            stringify!(delta)
-        )
-    );
 }
 pub const nl80211_bss_select_attr___NL80211_BSS_SELECT_ATTR_INVALID: nl80211_bss_select_attr = 0;
 pub const nl80211_bss_select_attr_NL80211_BSS_SELECT_ATTR_RSSI: nl80211_bss_select_attr = 1;
