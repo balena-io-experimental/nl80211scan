@@ -1,15 +1,7 @@
 mod enums;
 
-#[allow(
-    dead_code,
-    non_upper_case_globals,
-    non_camel_case_types,
-    non_snake_case,
-    deref_nullptr,
-    unaligned_references,
-    clippy::redundant_static_lifetimes
-)]
-mod nl80211;
+#[allow(dead_code, non_upper_case_globals, non_camel_case_types)]
+mod consts;
 
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
@@ -49,19 +41,19 @@ pub enum InterfaceType {
 impl From<::std::os::raw::c_uint> for InterfaceType {
     fn from(orig: ::std::os::raw::c_uint) -> Self {
         match orig {
-            nl80211::nl80211_iftype_NL80211_IFTYPE_UNSPECIFIED => InterfaceType::Unspecified,
-            nl80211::nl80211_iftype_NL80211_IFTYPE_ADHOC => InterfaceType::Adhoc,
-            nl80211::nl80211_iftype_NL80211_IFTYPE_STATION => InterfaceType::Station,
-            nl80211::nl80211_iftype_NL80211_IFTYPE_AP => InterfaceType::AP,
-            nl80211::nl80211_iftype_NL80211_IFTYPE_AP_VLAN => InterfaceType::APVlan,
-            nl80211::nl80211_iftype_NL80211_IFTYPE_WDS => InterfaceType::WDS,
-            nl80211::nl80211_iftype_NL80211_IFTYPE_MONITOR => InterfaceType::Monitor,
-            nl80211::nl80211_iftype_NL80211_IFTYPE_MESH_POINT => InterfaceType::MeshPoint,
-            nl80211::nl80211_iftype_NL80211_IFTYPE_P2P_CLIENT => InterfaceType::P2PClient,
-            nl80211::nl80211_iftype_NL80211_IFTYPE_P2P_GO => InterfaceType::P2PGo,
-            nl80211::nl80211_iftype_NL80211_IFTYPE_P2P_DEVICE => InterfaceType::P2PDevice,
-            nl80211::nl80211_iftype_NL80211_IFTYPE_OCB => InterfaceType::Ocb,
-            nl80211::nl80211_iftype_NL80211_IFTYPE_NAN => InterfaceType::Nan,
+            consts::NL80211_IFTYPE_UNSPECIFIED => InterfaceType::Unspecified,
+            consts::NL80211_IFTYPE_ADHOC => InterfaceType::Adhoc,
+            consts::NL80211_IFTYPE_STATION => InterfaceType::Station,
+            consts::NL80211_IFTYPE_AP => InterfaceType::AP,
+            consts::NL80211_IFTYPE_AP_VLAN => InterfaceType::APVlan,
+            consts::NL80211_IFTYPE_WDS => InterfaceType::WDS,
+            consts::NL80211_IFTYPE_MONITOR => InterfaceType::Monitor,
+            consts::NL80211_IFTYPE_MESH_POINT => InterfaceType::MeshPoint,
+            consts::NL80211_IFTYPE_P2P_CLIENT => InterfaceType::P2PClient,
+            consts::NL80211_IFTYPE_P2P_GO => InterfaceType::P2PGo,
+            consts::NL80211_IFTYPE_P2P_DEVICE => InterfaceType::P2PDevice,
+            consts::NL80211_IFTYPE_OCB => InterfaceType::Ocb,
+            consts::NL80211_IFTYPE_NAN => InterfaceType::Nan,
             _ => return InterfaceType::Unspecified,
         }
     }
