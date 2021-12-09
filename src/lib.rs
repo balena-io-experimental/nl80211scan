@@ -54,7 +54,7 @@ impl From<::std::os::raw::c_uint> for InterfaceType {
             consts::NL80211_IFTYPE_P2P_DEVICE => InterfaceType::P2PDevice,
             consts::NL80211_IFTYPE_OCB => InterfaceType::Ocb,
             consts::NL80211_IFTYPE_NAN => InterfaceType::Nan,
-            _ => return InterfaceType::Unspecified,
+            _ => InterfaceType::Unspecified,
         }
     }
 }
