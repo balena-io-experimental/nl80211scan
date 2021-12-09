@@ -3,19 +3,19 @@ mod enums;
 #[allow(dead_code, non_upper_case_globals, non_camel_case_types)]
 mod consts;
 
-use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
 
+use anyhow::Result;
+
 use macaddr::MacAddr6;
 
-use neli::attr::Attribute;
 use neli::consts::nl::{NlmF, NlmFFlags, Nlmsg};
 use neli::consts::socket::NlFamily;
-use neli::genl::{Genlmsghdr, Nlattr};
+use neli::genl::Genlmsghdr;
 use neli::nl::{NlPayload, Nlmsghdr};
 use neli::socket::NlSocketHandle;
-use neli::types::{Buffer, GenlBuffer, NlBuffer};
+use neli::types::{Buffer, GenlBuffer};
 
 use enums::{Nl80211Attr, Nl80211Cmd};
 
@@ -63,63 +63,35 @@ impl From<::std::os::raw::c_uint> for InterfaceType {
 pub struct Interface {
     name: String,
     index: u32,
-    interface_type: InterfaceType,
+    iftype: InterfaceType,
     wiphy: u32,
     wdev: u64,
     mac_address: MacAddr6,
 }
 
-impl Hash for Interface {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.mac_address.hash(state);
-    }
-}
+impl TryFrom<&Genlmsghdr<Nl80211Cmd, Nl80211Attr>> for Interface {
+    type Error = anyhow::Error;
 
-impl PartialEq for Interface {
-    fn eq(&self, other: &Self) -> bool {
-        self.mac_address == other.mac_address
-    }
-}
-
-impl Eq for Interface {}
-
-impl TryFrom<&[Nlattr<Nl80211Attr, Buffer>]> for Interface {
-    type Error = ();
-
-    fn try_from(iface_attrs: &[Nlattr<Nl80211Attr, Buffer>]) -> Result<Self, Self::Error> {
-        let iface_attrs: HashMap<_, _> = iface_attrs
-            .iter()
-            .map(|attr| (attr.nla_type.nla_type, attr))
-            .collect();
-
+    fn try_from(payload: &Genlmsghdr<Nl80211Cmd, Nl80211Attr>) -> Result<Self, Self::Error> {
+        let attrs = payload.get_attr_handle();
+        let name = attrs.get_attr_payload_as_with_len(Nl80211Attr::Ifname)?;
+        let index = attrs.get_attr_payload_as(Nl80211Attr::Ifindex)?;
+        let iftype = attrs
+            .get_attr_payload_as::<u32>(Nl80211Attr::Iftype)?
+            .into();
+        let wiphy = attrs.get_attr_payload_as(Nl80211Attr::Wiphy)?;
+        let wdev = attrs.get_attr_payload_as(Nl80211Attr::Wdev)?;
+        let mac_bytes: [u8; 6] = attrs
+            .get_attr_payload_as_with_len::<&[u8]>(Nl80211Attr::Mac)?
+            .try_into()?;
+        let mac_address = mac_bytes.into();
         Ok(Interface {
-            name: iface_attrs
-                .get(&Nl80211Attr::Ifname)
-                .and_then(|attr| attr.payload().as_ref().split_last())
-                .and_then(|(_, name_bytes)| String::from_utf8(name_bytes.to_vec()).ok())
-                .ok_or(())?,
-            index: iface_attrs
-                .get(&Nl80211Attr::Ifindex)
-                .and_then(|attr| attr.get_payload_as().ok())
-                .ok_or(())?,
-            interface_type: iface_attrs
-                .get(&Nl80211Attr::Iftype)
-                .and_then(|attr| attr.get_payload_as().ok())
-                .and_then(|if_type: u32| InterfaceType::try_from(if_type).ok())
-                .ok_or(())?,
-            wiphy: iface_attrs
-                .get(&Nl80211Attr::Wiphy)
-                .and_then(|attr| attr.get_payload_as().ok())
-                .ok_or(())?,
-            wdev: iface_attrs
-                .get(&Nl80211Attr::Wdev)
-                .and_then(|attr| attr.get_payload_as().ok())
-                .ok_or(())?,
-            mac_address: iface_attrs
-                .get(&Nl80211Attr::Mac)
-                .and_then(|attr| attr.payload().as_ref().try_into().ok())
-                .map(|mac_bytes: [u8; 6]| MacAddr6::from(mac_bytes))
-                .ok_or(())?,
+            name,
+            index,
+            iftype,
+            wiphy,
+            wdev,
+            mac_address,
         })
     }
 }
@@ -147,15 +119,14 @@ pub fn scan() {
 
     socket.send(nl_msghdr).expect("Failed to send message");
 
-    let interfaces = socket
+    let msgs = socket
         .recv_all::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>()
-        .iter()
-        .flat_map(NlBuffer::iter)
-        .filter_map(|nl_msghdr| nl_msghdr.get_payload().ok())
-        .filter_map(|payload| Interface::try_from(payload.get_attr_handle().get_attrs()).ok())
-        .collect::<HashSet<_>>();
+        .unwrap();
 
-    for interface in &interfaces {
-        println!("{:?}", interface);
+    for msg in msgs {
+        let payload = msg.get_payload().unwrap();
+        if let Ok(interface) = Interface::try_from(payload) {
+            println!("{:?}", interface);
+        }
     }
 }
