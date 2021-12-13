@@ -461,3 +461,29 @@ pub enum Nl80211Cmd {
 }
 
 impl neli::consts::genl::Cmd for Nl80211Cmd {}
+
+#[neli_enum(serialized_type = "u16")]
+pub enum Nl80211Bss {
+    Bssid = NL80211_BSS_BSSID as _,
+    Frequency = NL80211_BSS_FREQUENCY as _,
+    Tsf = NL80211_BSS_TSF as _,
+    BeaconInterval = NL80211_BSS_BEACON_INTERVAL as _,
+    Capability = NL80211_BSS_CAPABILITY as _,
+    InformationElements = NL80211_BSS_INFORMATION_ELEMENTS as _,
+    SignalMbm = NL80211_BSS_SIGNAL_MBM as _,
+    SignalUnspec = NL80211_BSS_SIGNAL_UNSPEC as _,
+    Status = NL80211_BSS_STATUS as _,
+    SeenMsAgo = NL80211_BSS_SEEN_MS_AGO as _,
+    BeaconIes = NL80211_BSS_BEACON_IES as _,
+    ChanWidth = NL80211_BSS_CHAN_WIDTH as _,
+    BeaconTsf = NL80211_BSS_BEACON_TSF as _,
+    PrespData = NL80211_BSS_PRESP_DATA as _,
+    LastSeenBoottime = NL80211_BSS_LAST_SEEN_BOOTTIME as _,
+    Pad = NL80211_BSS_PAD as _,
+    ParentTsf = NL80211_BSS_PARENT_TSF as _,
+    ParentBssid = NL80211_BSS_PARENT_BSSID as _,
+    ChainSignal = NL80211_BSS_CHAIN_SIGNAL as _,
+    FrequencyOffset = NL80211_BSS_FREQUENCY_OFFSET as _,
+}
+
+impl neli::consts::genl::NlAttrType for Nl80211Bss {}

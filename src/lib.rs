@@ -19,7 +19,7 @@ use neli::socket::tokio::NlSocket;
 use neli::socket::NlSocketHandle;
 use neli::types::{Buffer, GenlBuffer};
 
-use enums::{Nl80211Attr, Nl80211Cmd};
+use enums::{Nl80211Attr, Nl80211Bss, Nl80211Cmd};
 
 const NL80211_FAMILY_NAME: &str = "nl80211";
 const SCAN_MULTICAST_NAME: &str = "scan";
@@ -180,7 +180,39 @@ pub async fn scan() {
                 .filter_map(|nl_msghdr| nl_msghdr.get_payload().ok())
                 .any(|payload| payload.cmd == Nl80211Cmd::NewScanResults);
             if received_new_scan_notification {
-                println!("Return scan results");
+                let genl_msghdr = {
+                    let attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, interface.index);
+                    Genlmsghdr::new(Nl80211Cmd::GetScan, 1, attr.into_iter().collect())
+                };
+
+                let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
+
+                let nl_msghdr = {
+                    let id = socket.resolve_genl_family(NL80211_FAMILY_NAME).unwrap();
+                    let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Dump]);
+                    let payload = NlPayload::Payload(genl_msghdr);
+                    Nlmsghdr::new(None, id, flags, None, None, payload)
+                };
+
+                let mut socket = NlSocket::new(socket).unwrap();
+
+                socket.send(&nl_msghdr).await.unwrap();
+
+                let mut buf = vec![0; MAX_NL_LENGTH];
+
+                let msgs = socket
+                    .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
+                    .await
+                    .unwrap();
+
+                for msg in msgs {
+                    let payload = msg.get_payload().unwrap();
+                    let mut attrs = payload.get_attr_handle();
+                    let bss_attrs = attrs
+                        .get_nested_attributes::<Nl80211Bss>(Nl80211Attr::Bss)
+                        .unwrap();
+                    println!("{:?}", bss_attrs.get_attrs());
+                }
             } else {
                 println!("Already scanning");
             }
