@@ -1,5 +1,9 @@
+use anyhow::Result;
 use nl80211scan;
 
-fn main() {
-    nl80211scan::scan();
+#[tokio::main]
+async fn main() -> Result<()> {
+    nl80211scan::scan().await;
+
+    Ok(())
 }

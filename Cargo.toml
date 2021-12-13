@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-neli = "0.6"
+neli = { version = "0.6", features = ["async"] }
 num_enum = "*"
 macaddr = "*"
 anyhow = "*"
+tokio = { version = "1", features = ["full"] }

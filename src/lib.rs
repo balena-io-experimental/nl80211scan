@@ -12,14 +12,17 @@ use macaddr::MacAddr6;
 
 use neli::consts::nl::{NlmF, NlmFFlags, Nlmsg};
 use neli::consts::socket::NlFamily;
-use neli::genl::Genlmsghdr;
+use neli::consts::MAX_NL_LENGTH;
+use neli::genl::{Genlmsghdr, Nlattr};
 use neli::nl::{NlPayload, Nlmsghdr};
+use neli::socket::tokio::NlSocket;
 use neli::socket::NlSocketHandle;
 use neli::types::{Buffer, GenlBuffer};
 
 use enums::{Nl80211Attr, Nl80211Cmd};
 
 const NL80211_FAMILY_NAME: &str = "nl80211";
+const SCAN_MULTICAST_NAME: &str = "scan";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InterfaceType {
@@ -96,7 +99,7 @@ impl TryFrom<&Genlmsghdr<Nl80211Cmd, Nl80211Attr>> for Interface {
     }
 }
 
-pub fn scan() {
+pub async fn scan() {
     let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[])
         .expect("Failed to connect netlink socket");
 
@@ -108,6 +111,8 @@ pub fn scan() {
 
     println!("Family resolved: {}", id);
 
+    let mut socket = NlSocket::new(socket).unwrap();
+
     let genl_msghdr = {
         let attrs = GenlBuffer::<Nl80211Attr, Buffer>::new();
         Genlmsghdr::new(Nl80211Cmd::GetInterface, 1, attrs)
@@ -117,16 +122,68 @@ pub fn scan() {
     let payload = NlPayload::Payload(genl_msghdr);
     let nl_msghdr = Nlmsghdr::new(None, id, flags, None, None, payload);
 
-    socket.send(nl_msghdr).expect("Failed to send message");
+    socket
+        .send(&nl_msghdr)
+        .await
+        .expect("Failed to send message");
+
+    let mut buf = vec![0; MAX_NL_LENGTH];
 
     let msgs = socket
-        .recv_all::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>()
+        .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
+        .await
         .unwrap();
 
     for msg in msgs {
         let payload = msg.get_payload().unwrap();
         if let Ok(interface) = Interface::try_from(payload) {
             println!("{:?}", interface);
+
+            let genl_msghdr = {
+                let attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, interface.index);
+                Genlmsghdr::new(Nl80211Cmd::TriggerScan, 1, attr.into_iter().collect())
+            };
+
+            let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
+
+            let nl_msghdr = {
+                let id = socket.resolve_genl_family(NL80211_FAMILY_NAME).unwrap();
+                let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Ack]);
+                let payload = NlPayload::Payload(genl_msghdr);
+                Nlmsghdr::new(None, id, flags, None, None, payload)
+            };
+
+            let mut socket = NlSocket::new(socket).unwrap();
+
+            socket.send(&nl_msghdr).await.unwrap();
+
+            let mut buf = vec![0; MAX_NL_LENGTH];
+
+            socket.recv::<Nlmsg, Buffer>(&mut buf).await.unwrap();
+
+            let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
+
+            let id = socket
+                .resolve_nl_mcast_group(NL80211_FAMILY_NAME, SCAN_MULTICAST_NAME)
+                .unwrap();
+            socket.add_mcast_membership(&[id]).unwrap();
+
+            let mut socket = NlSocket::new(socket).unwrap();
+
+            let mut buf = vec![0; MAX_NL_LENGTH];
+
+            let received_new_scan_notification = socket
+                .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
+                .await
+                .unwrap()
+                .iter()
+                .filter_map(|nl_msghdr| nl_msghdr.get_payload().ok())
+                .any(|payload| payload.cmd == Nl80211Cmd::NewScanResults);
+            if received_new_scan_notification {
+                println!("Return scan results");
+            } else {
+                println!("Already scanning");
+            }
         }
     }
 }
