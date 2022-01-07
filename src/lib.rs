@@ -5,6 +5,8 @@ mod consts;
 
 use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
+use std::io::Cursor;
+use std::io::Read;
 
 use anyhow::Result;
 
@@ -21,8 +23,11 @@ use neli::types::{Buffer, GenlBuffer};
 
 use enums::{Nl80211Attr, Nl80211Bss, Nl80211Cmd};
 
+use byteorder::ReadBytesExt;
+
 const NL80211_FAMILY_NAME: &str = "nl80211";
 const SCAN_MULTICAST_NAME: &str = "scan";
+const WLAN_EID_SSID: u8 = 0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InterfaceType {
@@ -62,6 +67,7 @@ impl From<::std::os::raw::c_uint> for InterfaceType {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Interface {
     name: String,
@@ -98,6 +104,8 @@ impl TryFrom<&Genlmsghdr<Nl80211Cmd, Nl80211Attr>> for Interface {
         })
     }
 }
+
+use neli::attr::Attribute;
 
 pub async fn scan() {
     let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[])
@@ -211,11 +219,48 @@ pub async fn scan() {
                     let bss_attrs = attrs
                         .get_nested_attributes::<Nl80211Bss>(Nl80211Attr::Bss)
                         .unwrap();
-                    println!("{:?}", bss_attrs.get_attrs());
+
+                    let ie_attrs = bss_attrs
+                        .get_attribute(Nl80211Bss::InformationElements)
+                        .unwrap();
+
+                    let buffer = ie_attrs.payload();
+                    let mut cursor = Cursor::new(buffer.as_ref());
+                    let ssid = extract_ssid(&mut cursor);
+                    if let Ok(ssid_string) = std::str::from_utf8(&ssid) {
+                        println!("{}", ssid_string);
+                    } else {
+                        println!();
+                    }
+
+                    println!("=======================================================");
                 }
             } else {
                 println!("Already scanning");
             }
         }
     }
+}
+
+fn extract_ssid(cursor: &mut std::io::Cursor<&[u8]>) -> Vec<u8> {
+    loop {
+        match extract_element(cursor) {
+            Some((eid, data)) => {
+                if eid == WLAN_EID_SSID {
+                    return data;
+                }
+            },
+            None => break
+        }
+    }
+
+    Vec::new()
+}
+
+fn extract_element<'a>(cursor: &mut std::io::Cursor<&[u8]>) -> Option<(u8, Vec<u8>)> {
+    let eid = cursor.read_u8().ok()?;
+    let size = cursor.read_u8().ok()?;
+    let mut data = vec![0u8; size as _];
+    cursor.read_exact(&mut data).ok()?;
+    Some((eid, data))
 }

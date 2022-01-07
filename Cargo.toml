@@ -8,3 +8,4 @@ anyhow = "1"
 tokio = { version = "1", features = ["full"] }
 neli = { version = "0.6", features = ["async"] }
 macaddr = "1"
+byteorder = "1"
