@@ -220,6 +220,16 @@ pub async fn scan() {
                         .get_nested_attributes::<Nl80211Bss>(Nl80211Attr::Bss)
                         .unwrap();
 
+                    let signal_mbm = bss_attrs
+                        .get_attribute(Nl80211Bss::SignalMbm)
+                        .unwrap()
+                        .get_payload_as::<i32>()
+                        .unwrap();
+
+                    println!("Signal {}", signal_mbm);
+
+                    println!("Quality {}", dbm_level_to_quality(signal_mbm));
+
                     let ie_attrs = bss_attrs
                         .get_attribute(Nl80211Bss::InformationElements)
                         .unwrap();
@@ -249,8 +259,8 @@ fn extract_ssid(cursor: &mut std::io::Cursor<&[u8]>) -> Vec<u8> {
                 if eid == WLAN_EID_SSID {
                     return data;
                 }
-            },
-            None => break
+            }
+            None => break,
         }
     }
 
@@ -263,4 +273,18 @@ fn extract_element<'a>(cursor: &mut std::io::Cursor<&[u8]>) -> Option<(u8, Vec<u
     let mut data = vec![0u8; size as _];
     cursor.read_exact(&mut data).ok()?;
     Some((eid, data))
+}
+
+fn dbm_level_to_quality(signal: i32) -> u8 {
+    let mut val = f64::from(signal) / 100.;
+    println!("=> {} \t# f64::from(signal) / 100.", val);
+    val = val.clamp(-100., -40.);
+    println!("=> {} \t# val.clamp(-100., -40.)", val);
+    val = (val + 40.).abs();
+    println!("=> {} \t# (val + 40.).abs()", val);
+    val = (100. - (100. * val) / 60.).round();
+    println!("=> {} \t# (100. - (100. * val) / 60.).round()", val);
+    val = val.clamp(0., 100.);
+    println!("=> {} \t# val.clamp(0., 100.)", val);
+    val as u8
 }
