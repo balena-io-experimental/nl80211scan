@@ -148,8 +148,9 @@ pub async fn scan() {
             println!("{:?}", interface);
 
             let genl_msghdr = {
-                let attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, interface.index);
-                Genlmsghdr::new(Nl80211Cmd::TriggerScan, 1, attr.into_iter().collect())
+                let iface_attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, interface.index).unwrap();
+                let scan_attr = Nlattr::new(false, true, Nl80211Attr::ScanFlags, consts::NL80211_SCAN_FLAG_AP).unwrap();
+                Genlmsghdr::new(Nl80211Cmd::TriggerScan, 1, [iface_attr, scan_attr].into_iter().collect())
             };
 
             let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
@@ -161,12 +162,13 @@ pub async fn scan() {
                 Nlmsghdr::new(None, id, flags, None, None, payload)
             };
 
+            println!("Request scan");
+
             let mut socket = NlSocket::new(socket).unwrap();
 
             socket.send(&nl_msghdr).await.unwrap();
 
             let mut buf = vec![0; MAX_NL_LENGTH];
-
             socket.recv::<Nlmsg, Buffer>(&mut buf).await.unwrap();
 
             let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
@@ -175,6 +177,8 @@ pub async fn scan() {
                 .resolve_nl_mcast_group(NL80211_FAMILY_NAME, SCAN_MULTICAST_NAME)
                 .unwrap();
             socket.add_mcast_membership(&[id]).unwrap();
+
+            println!("Awaiting scan results...");
 
             let mut socket = NlSocket::new(socket).unwrap();
 
@@ -187,6 +191,9 @@ pub async fn scan() {
                 .iter()
                 .filter_map(|nl_msghdr| nl_msghdr.get_payload().ok())
                 .any(|payload| payload.cmd == Nl80211Cmd::NewScanResults);
+
+            println!("Scan results received");
+
             if received_new_scan_notification {
                 let genl_msghdr = {
                     let attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, interface.index);
