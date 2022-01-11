@@ -284,14 +284,9 @@ fn extract_element<'a>(cursor: &mut std::io::Cursor<&[u8]>) -> Option<(u8, Vec<u
 
 fn dbm_level_to_quality(signal: i32) -> u8 {
     let mut val = f64::from(signal) / 100.;
-    println!("=> {} \t# f64::from(signal) / 100.", val);
     val = val.clamp(-100., -40.);
-    println!("=> {} \t# val.clamp(-100., -40.)", val);
     val = (val + 40.).abs();
-    println!("=> {} \t# (val + 40.).abs()", val);
     val = (100. - (100. * val) / 60.).round();
-    println!("=> {} \t# (100. - (100. * val) / 60.).round()", val);
     val = val.clamp(0., 100.);
-    println!("=> {} \t# val.clamp(0., 100.)", val);
     val as u8
 }
