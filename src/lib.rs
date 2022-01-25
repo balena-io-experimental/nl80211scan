@@ -274,7 +274,7 @@ fn extract_ssid(cursor: &mut std::io::Cursor<&[u8]>) -> Vec<u8> {
     Vec::new()
 }
 
-fn extract_element<'a>(cursor: &mut std::io::Cursor<&[u8]>) -> Option<(u8, Vec<u8>)> {
+fn extract_element(cursor: &mut std::io::Cursor<&[u8]>) -> Option<(u8, Vec<u8>)> {
     let eid = cursor.read_u8().ok()?;
     let size = cursor.read_u8().ok()?;
     let mut data = vec![0u8; size as _];
