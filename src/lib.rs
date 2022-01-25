@@ -260,14 +260,9 @@ pub async fn scan() {
 }
 
 fn extract_ssid(cursor: &mut std::io::Cursor<&[u8]>) -> Vec<u8> {
-    loop {
-        match extract_element(cursor) {
-            Some((eid, data)) => {
-                if eid == WLAN_EID_SSID {
-                    return data;
-                }
-            }
-            None => break,
+    while let Some((eid, data)) = extract_element(cursor) {
+        if eid == WLAN_EID_SSID {
+            return data;
         }
     }
 
