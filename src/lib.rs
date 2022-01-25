@@ -148,9 +148,20 @@ pub async fn scan() {
             println!("{:?}", interface);
 
             let genl_msghdr = {
-                let iface_attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, interface.index).unwrap();
-                let scan_attr = Nlattr::new(false, true, Nl80211Attr::ScanFlags, consts::NL80211_SCAN_FLAG_AP).unwrap();
-                Genlmsghdr::new(Nl80211Cmd::TriggerScan, 1, [iface_attr, scan_attr].into_iter().collect())
+                let iface_attr =
+                    Nlattr::new(false, true, Nl80211Attr::Ifindex, interface.index).unwrap();
+                let scan_attr = Nlattr::new(
+                    false,
+                    true,
+                    Nl80211Attr::ScanFlags,
+                    consts::NL80211_SCAN_FLAG_AP,
+                )
+                .unwrap();
+                Genlmsghdr::new(
+                    Nl80211Cmd::TriggerScan,
+                    1,
+                    [iface_attr, scan_attr].into_iter().collect(),
+                )
             };
 
             let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
