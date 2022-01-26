@@ -8,7 +8,7 @@ use std::hash::Hash;
 use std::io::Cursor;
 use std::io::Read;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use macaddr::MacAddr6;
 
@@ -107,19 +107,19 @@ impl TryFrom<&Genlmsghdr<Nl80211Cmd, Nl80211Attr>> for Interface {
 
 use neli::attr::Attribute;
 
-pub async fn scan() {
-    let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[])
-        .expect("Failed to connect netlink socket");
+pub async fn scan() -> Result<()> {
+    let mut socket_handle = NlSocketHandle::connect(NlFamily::Generic, None, &[])
+        .context("Failed to establish netlink socket")?;
 
     println!("Socket connected");
 
-    let id = socket
+    let nl_id = socket_handle
         .resolve_genl_family(NL80211_FAMILY_NAME)
-        .expect("Failed to resolve nl80211 family");
+        .context("Failed to resolve nl80211 family")?;
 
-    println!("Family resolved: {}", id);
+    println!("Family resolved: {}", nl_id);
 
-    let mut socket = NlSocket::new(socket).unwrap();
+    let mut socket = NlSocket::new(socket_handle).unwrap();
 
     let genl_msghdr = {
         let attrs = GenlBuffer::<Nl80211Attr, Buffer>::new();
@@ -128,7 +128,7 @@ pub async fn scan() {
 
     let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Dump]);
     let payload = NlPayload::Payload(genl_msghdr);
-    let nl_msghdr = Nlmsghdr::new(None, id, flags, None, None, payload);
+    let nl_msghdr = Nlmsghdr::new(None, nl_id, flags, None, None, payload);
 
     socket
         .send(&nl_msghdr)
@@ -167,10 +167,9 @@ pub async fn scan() {
             let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
 
             let nl_msghdr = {
-                let id = socket.resolve_genl_family(NL80211_FAMILY_NAME).unwrap();
                 let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Ack]);
                 let payload = NlPayload::Payload(genl_msghdr);
-                Nlmsghdr::new(None, id, flags, None, None, payload)
+                Nlmsghdr::new(None, nl_id, flags, None, None, payload)
             };
 
             println!("Request scan");
@@ -184,10 +183,10 @@ pub async fn scan() {
 
             let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
 
-            let id = socket
+            let mcast_id = socket
                 .resolve_nl_mcast_group(NL80211_FAMILY_NAME, SCAN_MULTICAST_NAME)
                 .unwrap();
-            socket.add_mcast_membership(&[id]).unwrap();
+            socket.add_mcast_membership(&[mcast_id]).unwrap();
 
             println!("Awaiting scan results...");
 
@@ -214,10 +213,9 @@ pub async fn scan() {
                 let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
 
                 let nl_msghdr = {
-                    let id = socket.resolve_genl_family(NL80211_FAMILY_NAME).unwrap();
                     let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Dump]);
                     let payload = NlPayload::Payload(genl_msghdr);
-                    Nlmsghdr::new(None, id, flags, None, None, payload)
+                    Nlmsghdr::new(None, nl_id, flags, None, None, payload)
                 };
 
                 let mut socket = NlSocket::new(socket).unwrap();
@@ -268,6 +266,8 @@ pub async fn scan() {
             }
         }
     }
+
+    Ok(())
 }
 
 fn extract_ssid(cursor: &mut std::io::Cursor<&[u8]>) -> Vec<u8> {
