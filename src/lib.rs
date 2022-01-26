@@ -136,7 +136,7 @@ pub async fn scan() -> Result<()> {
         .expect("Failed to send message");
 
     let interfaces = recv_all(&mut socket, |msg| {
-        Interface::try_from(msg.get_payload().ok().unwrap()).ok()
+        Interface::try_from(msg.get_payload().ok()?).ok()
     })
     .await;
 
@@ -215,21 +215,18 @@ pub async fn scan() -> Result<()> {
                 let mut attrs = payload.get_attr_handle();
                 let bss_attrs = attrs
                     .get_nested_attributes::<Nl80211Bss>(Nl80211Attr::Bss)
-                    .unwrap();
+                    .ok()?;
 
                 let signal_mbm = bss_attrs
-                    .get_attribute(Nl80211Bss::SignalMbm)
-                    .unwrap()
+                    .get_attribute(Nl80211Bss::SignalMbm)?
                     .get_payload_as::<i32>()
-                    .unwrap();
+                    .ok()?;
 
                 println!("Signal {}", signal_mbm);
 
                 println!("Quality {}", dbm_level_to_quality(signal_mbm));
 
-                let ie_attrs = bss_attrs
-                    .get_attribute(Nl80211Bss::InformationElements)
-                    .unwrap();
+                let ie_attrs = bss_attrs.get_attribute(Nl80211Bss::InformationElements)?;
 
                 let buffer = ie_attrs.payload();
                 let mut cursor = Cursor::new(buffer.as_ref());
