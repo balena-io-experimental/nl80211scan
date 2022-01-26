@@ -234,11 +234,10 @@ pub async fn scan() -> Result<()> {
                 let buffer = ie_attrs.payload();
                 let mut cursor = Cursor::new(buffer.as_ref());
                 let ssid = extract_ssid(&mut cursor);
-                if let Ok(ssid_string) = std::str::from_utf8(&ssid) {
-                    println!("{}", ssid_string);
-                } else {
-                    println!();
-                }
+
+                let ssid_string = std::str::from_utf8(&ssid).ok().filter(|s| !s.is_empty());
+
+                println!("{:?}", ssid_string);
 
                 println!("=======================================================");
 
