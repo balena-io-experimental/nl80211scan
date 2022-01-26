@@ -8,7 +8,7 @@ use std::hash::Hash;
 use std::io::Cursor;
 use std::io::Read;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 
 use macaddr::MacAddr6;
 
@@ -28,6 +28,12 @@ use byteorder::ReadBytesExt;
 const NL80211_FAMILY_NAME: &str = "nl80211";
 const SCAN_MULTICAST_NAME: &str = "scan";
 const WLAN_EID_SSID: u8 = 0;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Station {
+    pub ssid: String,
+    pub quality: u8,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InterfaceType {
@@ -107,7 +113,7 @@ impl TryFrom<&Genlmsghdr<Nl80211Cmd, Nl80211Attr>> for Interface {
 
 use neli::attr::Attribute;
 
-pub async fn scan() -> Result<()> {
+pub async fn scan(interface: &str) -> Result<Vec<Station>> {
     let mut socket_handle = NlSocketHandle::connect(NlFamily::Generic, None, &[])
         .context("Failed to establish netlink socket")?;
 
@@ -140,114 +146,108 @@ pub async fn scan() -> Result<()> {
     })
     .await;
 
-    for interface in interfaces {
-        println!("{:?}", interface);
+    let iface = interfaces
+        .iter()
+        .find(|iface| iface.name == interface)
+        .unwrap();
 
-        let genl_msghdr = {
-            let iface_attr =
-                Nlattr::new(false, true, Nl80211Attr::Ifindex, interface.index).unwrap();
-            let scan_attr = Nlattr::new(
-                false,
-                true,
-                Nl80211Attr::ScanFlags,
-                consts::NL80211_SCAN_FLAG_AP,
-            )
-            .unwrap();
-            Genlmsghdr::new(
-                Nl80211Cmd::TriggerScan,
-                1,
-                [iface_attr, scan_attr].into_iter().collect(),
-            )
-        };
+    let genl_msghdr = {
+        let iface_attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, iface.index).unwrap();
+        let scan_attr = Nlattr::new(
+            false,
+            true,
+            Nl80211Attr::ScanFlags,
+            consts::NL80211_SCAN_FLAG_AP,
+        )
+        .unwrap();
+        Genlmsghdr::new(
+            Nl80211Cmd::TriggerScan,
+            1,
+            [iface_attr, scan_attr].into_iter().collect(),
+        )
+    };
 
-        let nl_msghdr = {
-            let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Ack]);
-            let payload = NlPayload::Payload(genl_msghdr);
-            Nlmsghdr::new(None, nl_id, flags, None, None, payload)
-        };
+    let nl_msghdr = {
+        let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Ack]);
+        let payload = NlPayload::Payload(genl_msghdr);
+        Nlmsghdr::new(None, nl_id, flags, None, None, payload)
+    };
 
-        println!("Request scan");
+    println!("Request scan");
 
-        socket.send(&nl_msghdr).await.unwrap();
+    socket.send(&nl_msghdr).await.unwrap();
 
-        let mut buf = vec![0; MAX_NL_LENGTH];
-        socket.recv::<Nlmsg, Buffer>(&mut buf).await.unwrap();
+    let mut buf = vec![0; MAX_NL_LENGTH];
+    socket.recv::<Nlmsg, Buffer>(&mut buf).await.unwrap();
 
-        let mut socket_mcast = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
+    let mut socket_mcast = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
 
-        let mcast_id = socket_mcast
-            .resolve_nl_mcast_group(NL80211_FAMILY_NAME, SCAN_MULTICAST_NAME)
-            .unwrap();
-        socket_mcast.add_mcast_membership(&[mcast_id]).unwrap();
+    let mcast_id = socket_mcast
+        .resolve_nl_mcast_group(NL80211_FAMILY_NAME, SCAN_MULTICAST_NAME)
+        .unwrap();
+    socket_mcast.add_mcast_membership(&[mcast_id]).unwrap();
 
-        println!("Awaiting scan results...");
+    println!("Awaiting scan results...");
 
-        let mut socket_mcast = NlSocket::new(socket_mcast).unwrap();
+    let mut socket_mcast = NlSocket::new(socket_mcast).unwrap();
 
-        let mut buf = vec![0; MAX_NL_LENGTH];
+    let mut buf = vec![0; MAX_NL_LENGTH];
 
-        let received_new_scan_notification = socket_mcast
-            .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
-            .await
-            .unwrap()
-            .iter()
-            .filter_map(|nl_msghdr| nl_msghdr.get_payload().ok())
-            .any(|payload| payload.cmd == Nl80211Cmd::NewScanResults);
+    let msgs = socket_mcast
+        .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
+        .await
+        .unwrap();
 
-        println!("Scan results received");
+    let has_scan_results = msgs
+        .iter()
+        .filter_map(|nl_msghdr| nl_msghdr.get_payload().ok())
+        .any(|payload| payload.cmd == Nl80211Cmd::NewScanResults);
 
-        if received_new_scan_notification {
-            let genl_msghdr = {
-                let attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, interface.index);
-                Genlmsghdr::new(Nl80211Cmd::GetScan, 1, attr.into_iter().collect())
-            };
-
-            let nl_msghdr = {
-                let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Dump]);
-                let payload = NlPayload::Payload(genl_msghdr);
-                Nlmsghdr::new(None, nl_id, flags, None, None, payload)
-            };
-
-            socket.send(&nl_msghdr).await.unwrap();
-
-            let _ = recv_all(&mut socket, |msg| {
-                let payload = msg.get_payload().unwrap();
-                let mut attrs = payload.get_attr_handle();
-                let bss_attrs = attrs
-                    .get_nested_attributes::<Nl80211Bss>(Nl80211Attr::Bss)
-                    .ok()?;
-
-                let signal_mbm = bss_attrs
-                    .get_attribute(Nl80211Bss::SignalMbm)?
-                    .get_payload_as::<i32>()
-                    .ok()?;
-
-                println!("Signal {}", signal_mbm);
-
-                println!("Quality {}", dbm_level_to_quality(signal_mbm));
-
-                let ie_attrs = bss_attrs.get_attribute(Nl80211Bss::InformationElements)?;
-
-                let buffer = ie_attrs.payload();
-                let mut cursor = Cursor::new(buffer.as_ref());
-                let ssid = extract_ssid(&mut cursor);
-
-                let ssid_string = std::str::from_utf8(&ssid).ok().filter(|s| !s.is_empty());
-
-                println!("{:?}", ssid_string);
-
-                println!("=======================================================");
-
-                Some(())
-            })
-            .await;
-        } else {
-            println!("Already scanning");
-        }
-        //}
+    if !has_scan_results {
+        bail!("No scan results received");
     }
 
-    Ok(())
+    println!("Scan results received");
+
+    let genl_msghdr = {
+        let attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, iface.index);
+        Genlmsghdr::new(Nl80211Cmd::GetScan, 1, attr.into_iter().collect())
+    };
+
+    let nl_msghdr = {
+        let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Dump]);
+        let payload = NlPayload::Payload(genl_msghdr);
+        Nlmsghdr::new(None, nl_id, flags, None, None, payload)
+    };
+
+    socket.send(&nl_msghdr).await.unwrap();
+
+    Ok(recv_all(&mut socket, |msg| {
+        let payload = msg.get_payload().unwrap();
+        let mut attrs = payload.get_attr_handle();
+        let bss_attrs = attrs
+            .get_nested_attributes::<Nl80211Bss>(Nl80211Attr::Bss)
+            .ok()?;
+
+        let signal_mbm = bss_attrs
+            .get_attribute(Nl80211Bss::SignalMbm)?
+            .get_payload_as::<i32>()
+            .ok()?;
+
+        let quality = dbm_level_to_quality(signal_mbm);
+
+        let ie_attrs = bss_attrs.get_attribute(Nl80211Bss::InformationElements)?;
+
+        let buffer = ie_attrs.payload();
+        let mut cursor = Cursor::new(buffer.as_ref());
+        let ssid_bytes = extract_ssid(&mut cursor);
+        let ssid = String::from_utf8(ssid_bytes)
+            .ok()
+            .filter(|s| !s.is_empty())?;
+
+        Some(Station { ssid, quality })
+    })
+    .await)
 }
 
 async fn recv_all<T, F>(socket: &mut NlSocket, mut f: F) -> Vec<T>
