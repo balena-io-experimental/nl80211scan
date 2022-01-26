@@ -135,139 +135,151 @@ pub async fn scan() -> Result<()> {
         .await
         .expect("Failed to send message");
 
-    let mut buf = vec![0; MAX_NL_LENGTH];
+    let interfaces = recv_all(&mut socket, |msg| {
+        Interface::try_from(msg.get_payload().ok().unwrap()).ok()
+    })
+    .await;
 
-    let msgs = socket
-        .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
-        .await
-        .unwrap();
+    for interface in interfaces {
+        println!("{:?}", interface);
 
-    for msg in msgs {
-        let payload = msg.get_payload().unwrap();
-        if let Ok(interface) = Interface::try_from(payload) {
-            println!("{:?}", interface);
+        let genl_msghdr = {
+            let iface_attr =
+                Nlattr::new(false, true, Nl80211Attr::Ifindex, interface.index).unwrap();
+            let scan_attr = Nlattr::new(
+                false,
+                true,
+                Nl80211Attr::ScanFlags,
+                consts::NL80211_SCAN_FLAG_AP,
+            )
+            .unwrap();
+            Genlmsghdr::new(
+                Nl80211Cmd::TriggerScan,
+                1,
+                [iface_attr, scan_attr].into_iter().collect(),
+            )
+        };
 
+        let nl_msghdr = {
+            let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Ack]);
+            let payload = NlPayload::Payload(genl_msghdr);
+            Nlmsghdr::new(None, nl_id, flags, None, None, payload)
+        };
+
+        println!("Request scan");
+
+        socket.send(&nl_msghdr).await.unwrap();
+
+        let mut buf = vec![0; MAX_NL_LENGTH];
+        socket.recv::<Nlmsg, Buffer>(&mut buf).await.unwrap();
+
+        let mut socket_mcast = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
+
+        let mcast_id = socket_mcast
+            .resolve_nl_mcast_group(NL80211_FAMILY_NAME, SCAN_MULTICAST_NAME)
+            .unwrap();
+        socket_mcast.add_mcast_membership(&[mcast_id]).unwrap();
+
+        println!("Awaiting scan results...");
+
+        let mut socket_mcast = NlSocket::new(socket_mcast).unwrap();
+
+        let mut buf = vec![0; MAX_NL_LENGTH];
+
+        let received_new_scan_notification = socket_mcast
+            .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
+            .await
+            .unwrap()
+            .iter()
+            .filter_map(|nl_msghdr| nl_msghdr.get_payload().ok())
+            .any(|payload| payload.cmd == Nl80211Cmd::NewScanResults);
+
+        println!("Scan results received");
+
+        if received_new_scan_notification {
             let genl_msghdr = {
-                let iface_attr =
-                    Nlattr::new(false, true, Nl80211Attr::Ifindex, interface.index).unwrap();
-                let scan_attr = Nlattr::new(
-                    false,
-                    true,
-                    Nl80211Attr::ScanFlags,
-                    consts::NL80211_SCAN_FLAG_AP,
-                )
-                .unwrap();
-                Genlmsghdr::new(
-                    Nl80211Cmd::TriggerScan,
-                    1,
-                    [iface_attr, scan_attr].into_iter().collect(),
-                )
+                let attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, interface.index);
+                Genlmsghdr::new(Nl80211Cmd::GetScan, 1, attr.into_iter().collect())
             };
 
-            let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
-
             let nl_msghdr = {
-                let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Ack]);
+                let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Dump]);
                 let payload = NlPayload::Payload(genl_msghdr);
                 Nlmsghdr::new(None, nl_id, flags, None, None, payload)
             };
 
-            println!("Request scan");
-
-            let mut socket = NlSocket::new(socket).unwrap();
-
             socket.send(&nl_msghdr).await.unwrap();
 
-            let mut buf = vec![0; MAX_NL_LENGTH];
-            socket.recv::<Nlmsg, Buffer>(&mut buf).await.unwrap();
-
-            let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
-
-            let mcast_id = socket
-                .resolve_nl_mcast_group(NL80211_FAMILY_NAME, SCAN_MULTICAST_NAME)
-                .unwrap();
-            socket.add_mcast_membership(&[mcast_id]).unwrap();
-
-            println!("Awaiting scan results...");
-
-            let mut socket = NlSocket::new(socket).unwrap();
-
-            let mut buf = vec![0; MAX_NL_LENGTH];
-
-            let received_new_scan_notification = socket
-                .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
-                .await
-                .unwrap()
-                .iter()
-                .filter_map(|nl_msghdr| nl_msghdr.get_payload().ok())
-                .any(|payload| payload.cmd == Nl80211Cmd::NewScanResults);
-
-            println!("Scan results received");
-
-            if received_new_scan_notification {
-                let genl_msghdr = {
-                    let attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, interface.index);
-                    Genlmsghdr::new(Nl80211Cmd::GetScan, 1, attr.into_iter().collect())
-                };
-
-                let mut socket = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
-
-                let nl_msghdr = {
-                    let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Dump]);
-                    let payload = NlPayload::Payload(genl_msghdr);
-                    Nlmsghdr::new(None, nl_id, flags, None, None, payload)
-                };
-
-                let mut socket = NlSocket::new(socket).unwrap();
-
-                socket.send(&nl_msghdr).await.unwrap();
-
-                let mut buf = vec![0; MAX_NL_LENGTH];
-
-                let msgs = socket
-                    .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
-                    .await
+            let _ = recv_all(&mut socket, |msg| {
+                let payload = msg.get_payload().unwrap();
+                let mut attrs = payload.get_attr_handle();
+                let bss_attrs = attrs
+                    .get_nested_attributes::<Nl80211Bss>(Nl80211Attr::Bss)
                     .unwrap();
 
-                for msg in msgs {
-                    let payload = msg.get_payload().unwrap();
-                    let mut attrs = payload.get_attr_handle();
-                    let bss_attrs = attrs
-                        .get_nested_attributes::<Nl80211Bss>(Nl80211Attr::Bss)
-                        .unwrap();
+                let signal_mbm = bss_attrs
+                    .get_attribute(Nl80211Bss::SignalMbm)
+                    .unwrap()
+                    .get_payload_as::<i32>()
+                    .unwrap();
 
-                    let signal_mbm = bss_attrs
-                        .get_attribute(Nl80211Bss::SignalMbm)
-                        .unwrap()
-                        .get_payload_as::<i32>()
-                        .unwrap();
+                println!("Signal {}", signal_mbm);
 
-                    println!("Signal {}", signal_mbm);
+                println!("Quality {}", dbm_level_to_quality(signal_mbm));
 
-                    println!("Quality {}", dbm_level_to_quality(signal_mbm));
+                let ie_attrs = bss_attrs
+                    .get_attribute(Nl80211Bss::InformationElements)
+                    .unwrap();
 
-                    let ie_attrs = bss_attrs
-                        .get_attribute(Nl80211Bss::InformationElements)
-                        .unwrap();
-
-                    let buffer = ie_attrs.payload();
-                    let mut cursor = Cursor::new(buffer.as_ref());
-                    let ssid = extract_ssid(&mut cursor);
-                    if let Ok(ssid_string) = std::str::from_utf8(&ssid) {
-                        println!("{}", ssid_string);
-                    } else {
-                        println!();
-                    }
-
-                    println!("=======================================================");
+                let buffer = ie_attrs.payload();
+                let mut cursor = Cursor::new(buffer.as_ref());
+                let ssid = extract_ssid(&mut cursor);
+                if let Ok(ssid_string) = std::str::from_utf8(&ssid) {
+                    println!("{}", ssid_string);
+                } else {
+                    println!();
                 }
-            } else {
-                println!("Already scanning");
+
+                println!("=======================================================");
+
+                Some(())
+            })
+            .await;
+        } else {
+            println!("Already scanning");
+        }
+        //}
+    }
+
+    Ok(())
+}
+
+async fn recv_all<T, F>(socket: &mut NlSocket, mut f: F) -> Vec<T>
+where
+    F: FnMut(Nlmsghdr<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>) -> Option<T>,
+{
+    let mut items = Vec::new();
+
+    'outer: loop {
+        let mut buf = vec![0; MAX_NL_LENGTH];
+
+        let msgs = socket
+            .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
+            .await
+            .unwrap();
+
+        for msg in msgs {
+            if msg.nl_type == Nlmsg::Done {
+                break 'outer;
+            }
+
+            if let Some(item) = f(msg) {
+                items.push(item);
             }
         }
     }
 
-    Ok(())
+    items
 }
 
 fn extract_ssid(cursor: &mut std::io::Cursor<&[u8]>) -> Vec<u8> {
