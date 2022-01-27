@@ -139,12 +139,13 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
     socket
         .send(&nl_msghdr)
         .await
-        .expect("Failed to send message");
+        .expect("Failed to send get interface message");
 
     let interfaces = recv_all(&mut socket, |msg| {
         Interface::try_from(msg.get_payload().ok()?).ok()
     })
-    .await;
+    .await
+    .context("Failed to receive get interface response")?;
 
     let iface = interfaces
         .iter()
@@ -236,7 +237,7 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
         .await
         .context("Failed to send get scan results message")?;
 
-    Ok(recv_all(&mut socket, |msg| {
+    recv_all(&mut socket, |msg| {
         let payload = msg.get_payload().ok()?;
         let mut attrs = payload.get_attr_handle();
         let bss_attrs = attrs
@@ -261,10 +262,11 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
 
         Some(Station { ssid, quality })
     })
-    .await)
+    .await
+    .context("Failed to receive get scan results response")
 }
 
-async fn recv_all<T, F>(socket: &mut NlSocket, mut f: F) -> Vec<T>
+async fn recv_all<T, F>(socket: &mut NlSocket, mut f: F) -> Result<Vec<T>>
 where
     F: FnMut(Nlmsghdr<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>) -> Option<T>,
 {
@@ -276,7 +278,7 @@ where
         let msgs = socket
             .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
             .await
-            .unwrap();
+            .context("Failed to receive nl80211 command response")?;
 
         for msg in msgs {
             if msg.nl_type == Nlmsg::Done {
@@ -289,7 +291,7 @@ where
         }
     }
 
-    items
+    Ok(items)
 }
 
 fn extract_ssid(cursor: &mut std::io::Cursor<&[u8]>) -> Vec<u8> {
