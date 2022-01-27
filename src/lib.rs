@@ -117,13 +117,9 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
     let mut socket_handle = NlSocketHandle::connect(NlFamily::Generic, None, &[])
         .context("Failed to establish netlink socket")?;
 
-    println!("Socket connected");
-
     let nl_id = socket_handle
         .resolve_genl_family(NL80211_FAMILY_NAME)
         .context("Failed to resolve nl80211 family")?;
-
-    println!("Family resolved: {}", nl_id);
 
     let mut socket = NlSocket::new(socket_handle).context("Failed to connect main socket")?;
 
@@ -175,8 +171,6 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
         Nlmsghdr::new(None, nl_id, flags, None, None, payload)
     };
 
-    println!("Request scan");
-
     socket
         .send(&nl_msghdr)
         .await
@@ -198,8 +192,6 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
         .add_mcast_membership(&[mcast_id])
         .context("Failed to add multicast membership")?;
 
-    println!("Awaiting scan results...");
-
     let mut socket_mcast =
         NlSocket::new(socket_handle_mcast).context("Failed to set up multicast socket")?;
 
@@ -218,8 +210,6 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
     if !has_scan_results {
         bail!("No scan results received");
     }
-
-    println!("Scan results received");
 
     let genl_msghdr = {
         let attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, iface.index);
