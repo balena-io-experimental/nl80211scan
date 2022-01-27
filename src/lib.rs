@@ -38,6 +38,27 @@ pub struct Station {
 pub async fn scan(interface: &str) -> Result<Vec<Station>> {
     let (mut socket, nl_id) = create_main_socket()?;
 
+    let ifaces = get_interfaces(&mut socket, nl_id)
+        .await
+        .context("Failed to get interfaces")?;
+
+    let iface = ifaces
+        .iter()
+        .find(|iface| iface.name == interface)
+        .context("Interface not found")?;
+
+    trigger_scan(&mut socket, nl_id, iface.index)
+        .await
+        .context("Failed to trigger scan")?;
+
+    let mut socket_mcast = create_multicast_socket()?;
+
+    complete_scan(&mut socket_mcast).await?;
+
+    get_scan_results(&mut socket, nl_id, iface.index).await
+}
+
+async fn get_interfaces(socket: &mut NlSocket, nl_id: u16) -> Result<Vec<Interface>> {
     let nl_msghdr = create_get_interface_message(nl_id);
 
     socket
@@ -45,33 +66,32 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
         .await
         .expect("Failed to send get interface message");
 
-    let interfaces = recv_all(&mut socket, |msg| {
+    recv_all(socket, |msg| {
         Interface::try_from(msg.get_payload().ok()?).ok()
     })
     .await
-    .context("Failed to receive get interface response")?;
+    .context("Failed to receive get interface response")
+}
 
-    let iface = interfaces
-        .iter()
-        .find(|iface| iface.name == interface)
-        .context("Interface not found")?;
-
-    let nl_msghdr = create_trigger_scan_message(nl_id, iface.index)?;
+async fn trigger_scan(socket: &mut NlSocket, nl_id: u16, iface_index: u32) -> Result<()> {
+    let nl_msghdr = create_trigger_scan_message(nl_id, iface_index)?;
 
     socket
         .send(&nl_msghdr)
         .await
-        .context("Failed to send request scan message")?;
+        .context("Failed to send trigger scan message")?;
 
     let mut buf = vec![0; MAX_NL_LENGTH];
 
     socket
         .recv::<Nlmsg, Buffer>(&mut buf)
         .await
-        .context("Failed to receive request scan acknowledgement")?;
+        .context("Failed to receive trigger scan acknowledgement")?;
 
-    let mut socket_mcast = create_multicast_socket()?;
+    Ok(())
+}
 
+async fn complete_scan(socket_mcast: &mut NlSocket) -> Result<()> {
     let mut buf = vec![0; MAX_NL_LENGTH];
     let msgs = socket_mcast
         .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
@@ -87,14 +107,22 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
         bail!("No scan results received");
     }
 
-    let nl_msghdr = create_get_scan_message(nl_id, iface.index);
+    Ok(())
+}
+
+async fn get_scan_results(
+    socket: &mut NlSocket,
+    nl_id: u16,
+    iface_index: u32,
+) -> Result<Vec<Station>> {
+    let nl_msghdr = create_get_scan_message(nl_id, iface_index);
 
     socket
         .send(&nl_msghdr)
         .await
         .context("Failed to send get scan results message")?;
 
-    recv_all(&mut socket, |msg| {
+    recv_all(socket, |msg| {
         let payload = msg.get_payload().ok()?;
         let mut attrs = payload.get_attr_handle();
         let bss_attrs = attrs
