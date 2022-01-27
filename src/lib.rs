@@ -125,7 +125,7 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
 
     println!("Family resolved: {}", nl_id);
 
-    let mut socket = NlSocket::new(socket_handle).unwrap();
+    let mut socket = NlSocket::new(socket_handle).context("Failed to connect main socket")?;
 
     let genl_msghdr = {
         let attrs = GenlBuffer::<Nl80211Attr, Buffer>::new();
@@ -149,17 +149,18 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
     let iface = interfaces
         .iter()
         .find(|iface| iface.name == interface)
-        .unwrap();
+        .context("Interface not found")?;
 
     let genl_msghdr = {
-        let iface_attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, iface.index).unwrap();
+        let iface_attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, iface.index)
+            .context("Faled to create interface index attribute")?;
         let scan_attr = Nlattr::new(
             false,
             true,
             Nl80211Attr::ScanFlags,
             consts::NL80211_SCAN_FLAG_AP,
         )
-        .unwrap();
+        .context("Failed to create scan flags attribute")?;
         Genlmsghdr::new(
             Nl80211Cmd::TriggerScan,
             1,
@@ -175,28 +176,38 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
 
     println!("Request scan");
 
-    socket.send(&nl_msghdr).await.unwrap();
+    socket
+        .send(&nl_msghdr)
+        .await
+        .context("Failed to send request scan message")?;
 
     let mut buf = vec![0; MAX_NL_LENGTH];
-    socket.recv::<Nlmsg, Buffer>(&mut buf).await.unwrap();
+    socket
+        .recv::<Nlmsg, Buffer>(&mut buf)
+        .await
+        .context("Failed to receive request scan acknowledgement")?;
 
-    let mut socket_mcast = NlSocketHandle::connect(NlFamily::Generic, None, &[]).unwrap();
+    let mut socket_handle_mcast = NlSocketHandle::connect(NlFamily::Generic, None, &[])
+        .context("Failed to connect multicast socket")?;
 
-    let mcast_id = socket_mcast
+    let mcast_id = socket_handle_mcast
         .resolve_nl_mcast_group(NL80211_FAMILY_NAME, SCAN_MULTICAST_NAME)
-        .unwrap();
-    socket_mcast.add_mcast_membership(&[mcast_id]).unwrap();
+        .context("Failed to resolve muticast group")?;
+    socket_handle_mcast
+        .add_mcast_membership(&[mcast_id])
+        .context("Failed to add multicast membership")?;
 
     println!("Awaiting scan results...");
 
-    let mut socket_mcast = NlSocket::new(socket_mcast).unwrap();
+    let mut socket_mcast =
+        NlSocket::new(socket_handle_mcast).context("Failed to set up multicast socket")?;
 
     let mut buf = vec![0; MAX_NL_LENGTH];
 
     let msgs = socket_mcast
         .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
         .await
-        .unwrap();
+        .context("Failed to receive new scan results notification")?;
 
     let has_scan_results = msgs
         .iter()
@@ -220,10 +231,13 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
         Nlmsghdr::new(None, nl_id, flags, None, None, payload)
     };
 
-    socket.send(&nl_msghdr).await.unwrap();
+    socket
+        .send(&nl_msghdr)
+        .await
+        .context("Failed to send get scan results message")?;
 
     Ok(recv_all(&mut socket, |msg| {
-        let payload = msg.get_payload().unwrap();
+        let payload = msg.get_payload().ok()?;
         let mut attrs = payload.get_attr_handle();
         let bss_attrs = attrs
             .get_nested_attributes::<Nl80211Bss>(Nl80211Attr::Bss)
