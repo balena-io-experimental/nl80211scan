@@ -36,23 +36,9 @@ pub struct Station {
 }
 
 pub async fn scan(interface: &str) -> Result<Vec<Station>> {
-    let mut socket_handle = NlSocketHandle::connect(NlFamily::Generic, None, &[])
-        .context("Failed to establish netlink socket")?;
+    let (mut socket, nl_id) = create_main_socket()?;
 
-    let nl_id = socket_handle
-        .resolve_genl_family(NL80211_FAMILY_NAME)
-        .context("Failed to resolve nl80211 family")?;
-
-    let mut socket = NlSocket::new(socket_handle).context("Failed to connect main socket")?;
-
-    let genl_msghdr = {
-        let attrs = GenlBuffer::<Nl80211Attr, Buffer>::new();
-        Genlmsghdr::new(Nl80211Cmd::GetInterface, 1, attrs)
-    };
-
-    let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Dump]);
-    let payload = NlPayload::Payload(genl_msghdr);
-    let nl_msghdr = Nlmsghdr::new(None, nl_id, flags, None, None, payload);
+    let nl_msghdr = create_get_interface_message(nl_id);
 
     socket
         .send(&nl_msghdr)
@@ -70,28 +56,7 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
         .find(|iface| iface.name == interface)
         .context("Interface not found")?;
 
-    let genl_msghdr = {
-        let iface_attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, iface.index)
-            .context("Faled to create interface index attribute")?;
-        let scan_attr = Nlattr::new(
-            false,
-            true,
-            Nl80211Attr::ScanFlags,
-            consts::NL80211_SCAN_FLAG_AP,
-        )
-        .context("Failed to create scan flags attribute")?;
-        Genlmsghdr::new(
-            Nl80211Cmd::TriggerScan,
-            1,
-            [iface_attr, scan_attr].into_iter().collect(),
-        )
-    };
-
-    let nl_msghdr = {
-        let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Ack]);
-        let payload = NlPayload::Payload(genl_msghdr);
-        Nlmsghdr::new(None, nl_id, flags, None, None, payload)
-    };
+    let nl_msghdr = create_trigger_scan_message(nl_id, iface.index)?;
 
     socket
         .send(&nl_msghdr)
@@ -99,26 +64,15 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
         .context("Failed to send request scan message")?;
 
     let mut buf = vec![0; MAX_NL_LENGTH];
+
     socket
         .recv::<Nlmsg, Buffer>(&mut buf)
         .await
         .context("Failed to receive request scan acknowledgement")?;
 
-    let mut socket_handle_mcast = NlSocketHandle::connect(NlFamily::Generic, None, &[])
-        .context("Failed to connect multicast socket")?;
-
-    let mcast_id = socket_handle_mcast
-        .resolve_nl_mcast_group(NL80211_FAMILY_NAME, SCAN_MULTICAST_NAME)
-        .context("Failed to resolve muticast group")?;
-    socket_handle_mcast
-        .add_mcast_membership(&[mcast_id])
-        .context("Failed to add multicast membership")?;
-
-    let mut socket_mcast =
-        NlSocket::new(socket_handle_mcast).context("Failed to set up multicast socket")?;
+    let mut socket_mcast = create_multicast_socket()?;
 
     let mut buf = vec![0; MAX_NL_LENGTH];
-
     let msgs = socket_mcast
         .recv::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>(&mut buf)
         .await
@@ -133,16 +87,7 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
         bail!("No scan results received");
     }
 
-    let genl_msghdr = {
-        let attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, iface.index);
-        Genlmsghdr::new(Nl80211Cmd::GetScan, 1, attr.into_iter().collect())
-    };
-
-    let nl_msghdr = {
-        let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Dump]);
-        let payload = NlPayload::Payload(genl_msghdr);
-        Nlmsghdr::new(None, nl_id, flags, None, None, payload)
-    };
+    let nl_msghdr = create_get_scan_message(nl_id, iface.index);
 
     socket
         .send(&nl_msghdr)
@@ -176,6 +121,77 @@ pub async fn scan(interface: &str) -> Result<Vec<Station>> {
     })
     .await
     .context("Failed to receive get scan results response")
+}
+
+fn create_main_socket() -> Result<(NlSocket, u16)> {
+    let mut socket_handle = NlSocketHandle::connect(NlFamily::Generic, None, &[])
+        .context("Failed to establish netlink socket")?;
+
+    let nl_id = socket_handle
+        .resolve_genl_family(NL80211_FAMILY_NAME)
+        .context("Failed to resolve nl80211 family")?;
+
+    let socket = NlSocket::new(socket_handle).context("Failed to connect main socket")?;
+
+    Ok((socket, nl_id))
+}
+
+fn create_multicast_socket() -> Result<NlSocket> {
+    let mut socket_handle_mcast = NlSocketHandle::connect(NlFamily::Generic, None, &[])
+        .context("Failed to connect multicast socket")?;
+
+    let mcast_id = socket_handle_mcast
+        .resolve_nl_mcast_group(NL80211_FAMILY_NAME, SCAN_MULTICAST_NAME)
+        .context("Failed to resolve muticast group")?;
+    socket_handle_mcast
+        .add_mcast_membership(&[mcast_id])
+        .context("Failed to add multicast membership")?;
+
+    NlSocket::new(socket_handle_mcast).context("Failed to set up multicast socket")
+}
+
+fn create_get_interface_message(nl_id: u16) -> Nlmsghdr<u16, Genlmsghdr<Nl80211Cmd, Nl80211Attr>> {
+    let attrs = GenlBuffer::<Nl80211Attr, Buffer>::new();
+    let genl_msghdr = Genlmsghdr::new(Nl80211Cmd::GetInterface, 1, attrs);
+    let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Dump]);
+    let payload = NlPayload::Payload(genl_msghdr);
+    Nlmsghdr::new(None, nl_id, flags, None, None, payload)
+}
+
+fn create_trigger_scan_message(
+    nl_id: u16,
+    iface_index: u32,
+) -> Result<Nlmsghdr<u16, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>> {
+    let iface_attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, iface_index)
+        .context("Faled to create interface index attribute")?;
+    let scan_attr = Nlattr::new(
+        false,
+        true,
+        Nl80211Attr::ScanFlags,
+        consts::NL80211_SCAN_FLAG_AP,
+    )
+    .context("Failed to create scan flags attribute")?;
+    let genl_msghdr = Genlmsghdr::new(
+        Nl80211Cmd::TriggerScan,
+        1,
+        [iface_attr, scan_attr].into_iter().collect(),
+    );
+
+    let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Ack]);
+    let payload = NlPayload::Payload(genl_msghdr);
+    Ok(Nlmsghdr::new(None, nl_id, flags, None, None, payload))
+}
+
+fn create_get_scan_message(
+    nl_id: u16,
+    iface_index: u32,
+) -> Nlmsghdr<u16, Genlmsghdr<Nl80211Cmd, Nl80211Attr>> {
+    let attr = Nlattr::new(false, true, Nl80211Attr::Ifindex, iface_index);
+    let genl_msghdr = Genlmsghdr::new(Nl80211Cmd::GetScan, 1, attr.into_iter().collect());
+
+    let flags = NlmFFlags::new(&[NlmF::Request, NlmF::Dump]);
+    let payload = NlPayload::Payload(genl_msghdr);
+    Nlmsghdr::new(None, nl_id, flags, None, None, payload)
 }
 
 async fn recv_all<T, F>(socket: &mut NlSocket, mut f: F) -> Result<Vec<T>>
